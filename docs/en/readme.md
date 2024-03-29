@@ -4,6 +4,7 @@ Table of Contents
 * Getting Started
   * [About Cycle ORM](/docs/en/intro/about.md)
   * [**Installation**](/docs/en/intro/install.md)
+  * [Integrations](/docs/en/intro/integrations.md)
   * [Upgrade Guide](/docs/en/intro/upgrade.md)
   * [Contributing](contributing.md)
     * [Issue with Test Case](issue-test-case.md)
