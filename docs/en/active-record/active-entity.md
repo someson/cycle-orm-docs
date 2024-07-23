@@ -2,12 +2,11 @@
 
 ## Defining Entities
 
-To work with the Cycle Active Record, you need to define entities that extend the `ActiveRecord` class.
-There are two common approaches to defining entities: the `strict` approach and the `fluent` approach.
+To work with the Cycle Active Record, you need to extend the entity class with the `ActiveRecord`.
 
-These approaches will be used as main examples across documentation to demonstrate various aspects of the library.
-
-> [Cycle ORM Annotated Entities](/docs/en/annotated/entity.md)
+> Note
+> Below are examples of defining entities using attributes (see [Annotated Entities](/docs/en/annotated/entity.md)),
+> but you are still free to define entities in any other way.
 
 :::: tabs
 
@@ -15,7 +14,7 @@ These approaches will be used as main examples across documentation to demonstra
 
 **Strict Approach:**
 
-In the strict approach, you define your entity with private properties and provide public getter and setter methods to access and modify the properties.
+In the **strict** approach, you define your entity with private properties and provide public getter and setter methods to access and modify the properties.
 
 This approach encapsulates the entity's internal state and provides better control over how the properties are accessed and modified.
 
@@ -29,7 +28,9 @@ namespace App\Entities;
 use Cycle\ActiveRecord\ActiveRecord;
 use Cycle\Annotated\Annotation\Column;
 use Cycle\Annotated\Annotation\Entity;
+use Cycle\ORM\Entity\Behavior\CreatedAt;
 
+#[CreatedAt(field: 'createdAt')]
 #[Entity(table: 'users')]
 class User extends ActiveRecord
 {
@@ -42,10 +43,20 @@ class User extends ActiveRecord
     #[Column(type: 'string', unique: true)]
     private string $email;
 
+    private \DatetimeImmutable $createdAt;
+
     public function __construct(string $name, string $email)
     {
         $this->name = $name;
         $this->email = $email;
+    }
+
+    public static function create(string $name, string $email): static
+    {
+        return static::make([
+            'name' => $name,
+            'email' => $email,
+        ]);
     }
 
     public function id(): int
@@ -81,7 +92,7 @@ class User extends ActiveRecord
 
 **Fluent Approach:**
 
-In the fluent approach, you define your entity with public properties, allowing direct access to the properties without the need for explicit getter and setter methods.
+In the **fluent** approach, you define your entity with public properties, allowing direct access to the properties without the need for explicit getter and setter methods.
 
 This approach leads to more concise and readable code, especially when dealing with simple entities.
 
@@ -95,7 +106,9 @@ namespace App\Entities;
 use Cycle\ActiveRecord\ActiveRecord;
 use Cycle\Annotated\Annotation\Column;
 use Cycle\Annotated\Annotation\Entity;
+use Cycle\ORM\Entity\Behavior\CreatedAt;
 
+#[CreatedAt(field: 'createdAt')]
 #[Entity(table: 'users')]
 class User extends ActiveRecord
 {
@@ -108,6 +121,8 @@ class User extends ActiveRecord
     #[Column(type: 'string', unique: true)]
     public string $email;
 
+    public \DatetimeImmutable $createdAt;
+
     public function __construct(string $name, string $email)
     {
         $this->name = $name;
@@ -118,94 +133,216 @@ class User extends ActiveRecord
 
 :::
 
-::::
+::: tab Extended
 
+In this example, we do not focus on whether the fields in the entity are private or public. What is important here is:
 
-## Select Entities
-
-Once you have created [your first entities](defining-entities.md) and [configured](../general/installation.md) one of the adapter packages, you can begin retrieving entities from the database.
-
-Entities that extends `ActiveRecord` class includes powerful Cycle-ORM Query Builder allowing you to fluently query the database table associated with the Entity.
-
-Here is example with `findAll()` method, which will retrieve all of the records from the entity associated database table:
-
-:::: tabs
-
-::: tab Strict
-
-Example with private properties and public getter methods. The `findAll()` method returns all the records from the `users` table, and we can access the `name` property using the `name()` method.
+- Value Objects are used instead of primitive types. See [Column wrappers](/docs/en/advanced/column-wrappers.md) to learn more.
+- We prohibit the use of the constructor.
 
 ```php
-<?php
+#[CreatedAt(field: 'createdAt')]
+#[Entity(table: 'users')]
+class User extends ActiveRecord
+{
+    #[Column(type: 'bigInteger', primary: true, typecast: 'uuid')]
+    public UuidInterface $id;
 
-use App\Entities\User;
+    #[Column(type: 'string', typecast: UserName::class)]
+    public UserName $name;
 
-$users = User::findAll();
+    #[Column(type: 'string', unique: true, typecast: UserEmail::class)]
+    public UserEmail $email;
 
-foreach ($users as $user) {
-    echo $user->name();
+    public \DatetimeImmutable $createdAt;
+
+    private function __construct() {}
+
+    public static function create(string $name, string $email): static
+    {
+        return static::make([
+            'name' => $name,
+            'email' => $email,
+        ]);
+    }
 }
 ```
 
-:::
+A simple Value Object sample:
 
-::: tab Fluent
+```php UserName.php
+// Stringable interface is used to provide a string value for Database
+class UserName implements \Stringable
+{
+    // ... constructor and __toString method
 
-If you are using the fluent approach with public properties, you can directly access the properties:
+    // Will be used by the User
+    public static function create(string $value): self
+    {
+        self::validate($value);
+        return new self($value);
+    }
 
-```php
-<?php
-
-use App\Entities\User;
-
-$users = User::findAll();
-
-foreach ($users as $user) {
-    echo $user->name;
+    // Will be used by ORM that's why validation is not needed
+    public static function typecast(string $value): self
+    {
+        return new self($value);
+    }
 }
 ```
+
+### Explanation
+
+Using the constructor when creating entities can lead to [undesirable effects](https://spiral.dev/blog/cycle-orm-hungry-for-relations).
+It's recommended to use `ORMInterface::make()` instead of the constructor.
+To be friendlier, `ActiveRecord` provides the `make()` method directly on the entity.
+
+```php
+$user = User::make([
+   'name' => 'John Doe',
+   'email' => 'johndoe@example.com',
+]);
+```
+
+However, this is still not convenient enough. The recommended approach is as follows:
+
+- Use Value Objects for fields that may also validate the data.
+  This approach adds a lot of type safety, and you can ensure that the data is always valid.
+- Create a static factory method that will accept all necessary fields:
+  ```php
+  public static function create(UserName $name, UserEmail $email): static
+  {
+      return static::make([
+          'name' => $name,
+          'email' => $email,
+      ]);
+  }
+  ```
+- Make the constructor private to prohibit creating entities via `new`.
+- You can inherit from the `ActiveRecord` class to extend this to all Active Entities:
+  ```php
+  abstract class AR extends \Cycle\ActiveRecord\ActiveRecord
+  {
+      final private function __construct() {}
+  }
+
+  class User extends AR
+  {
+      // ...
+  }
+  ```
 
 :::
 
 ::::
+
+
+## Creating Entities
+
+Once the entities are described, we can start working with them.
+
+Using constructors is not recommended, as it can lead to [undesirable effects](https://spiral.dev/blog/cycle-orm-hungry-for-relations), but it's still possible to use them.
+Look at the [Extended Defining Entities](#defining-entities) section for more information.
+
+### Using `make()` Method
+
+The `make()` method is a static factory method that accepts an array of properties and returns a new instance of the entity.
+
+```php
+$user = User::make([
+    'name' => $name,
+    'email' => $email,
+]);
+```
+
+## Persisting Entities
+
+To save the entity to the database, you can use the `save()` method:
+The `save()` method returns a result object that contains information about the operation.
+
+```php
+$result = $user->save();
+
+// Check if the operation was successful
+$result->isSuccess();
+```
+
+If you prefer to have an exception thrown when the operation fails, you can use the `saveOrFail()` method:
+
+```php
+$user->saveOrFail();
+```
+
+Each call to the `save()` or `saveOrFail()` method generates at least one transaction to the database.
+However, you may need to save multiple distinct entities in a single transaction.
+To achieve this, you can use the `persist()` method:
+
+```php
+foreach ($users as $user) {
+    $em = $user->persist();
+}
+$em->run();
+```
+
+As you may have already understood, the `persist()` method returns an `EntityManager` object, which can be used in a chain of calls and to initiate a transaction.
+
+```php
+$user->persist()
+    ->persist($account)
+    ->delete($post)
+    ->run();
+```
+
+
+## Querying Entities
+
+Entities that extends `ActiveRecord` class includes powerful Cycle-ORM Query Builder
+allowing you to fluently query the database table associated with the Entity.
+
+The process of querying data usually takes the following three steps:
+
+1. Create a new query object by calling the `ActiveRecord::query()` method;
+2. Build the query object by calling query building methods;
+3. Call a query method to retrieve data in terms of Active Record instances.
 
 ### Building Queries
 
-The ActiveRecord `findAll()` method will return all of the results in the entity table. However, since each ActiveRecord Entity includes a [query builder](https://cycle-orm.dev/docs/query-builder-basic/current/en), you may add additional constraints using `query()` method and then invoke the `fetchAll()` method to retrieve the results:
+The `ActiveRecord::query()` method returns a new instance of the `ActiveQuery` class,
+which is a wrapper around the query builder provided by Cycle ORM.
+It means that you can use all the methods provided by the [query builder](/docs/en/query-builder/basic.md) and additionally some methods provided by the related [`ActiveQuery` class](/docs/en/active-record/active-query.md).
 
 ```php
-<?php
-
-use App\Entities\User;
-
-$users = User::query()
-    ->where('active', 1)
-    ->orderBy('name')
+// Query all the dog people
+$dogsGuys = User::query()
+    ->where('likes_dogs', true)
     ->fetchAll();
+
+// Query 10 users who have a dog named Rex
+$rexOwners = User::query()
+    ->load('pet', ['where' => ['type' => 'dog', 'name' => 'Rex']])
+    ->limit(10)
+    ->fetchAll();
+
+// Query user by id
+$user = User::findByPK($id);
 ```
 
-In this example, we use the `query()` method to start building a query.
+## Deleting Entities
 
-> Info
-> Since ActiveRecord Entities includes access to query builder, you should review all of the methods provided by Cycle [query builder](https://cycle-orm.dev/docs/query-builder-basic/current/en). You may use any of these methods when writing your queries.
+To delete a single record, first retrieve the Active Record entity and then call the `delete()` or `deleteOrFail()` method.
 
-> Info
-> For advanced usage of the query builder, this package provides a way to group your queries into separate Query classes by creating classes that extend the [`ActiveQuery`](../active-queries/query-classes.md) class.
+```php
+User::findByPK($id)->delete();
 
-### Collections
+Post::findByPK($id)->deleteOrFail();
+```
 
-The Cycle Active Record team is constantly working on improving the library. Keep an eye on the [official repository](https://github.com/cycle/active-record) for updates and new features, such as the potential introduction of Collection support for query results.
+To delete multiple records, you can use the `remove()` method that prepares the entity for deletion.
+It works similarly to the `persist()` method, but it marks the entity for deletion.
 
-There is currently a Proof of Concept (PoC) Pull Request for introducing Collection support for query results:
-
-* [PR #20: Implement basic collections](https://github.com/cycle/active-record/pull/20)
-
-If you're interested in using Collections with Cycle Active Record, you can:
-
-1. Follow the progress of this PR
-2. Contribute to the discussion by providing feedback or use cases
-3. Help with the implementation if you have experience with Collections in ORMs
-
-Contributions from the community are welcome and can significantly impact the direction and features of the library. If Collections are a feature you're particularly interested in, consider getting involved in the development process.
-
-Remember to check the contribution guidelines before submitting any code or opening issues.
+```php
+$user->remove()
+    ->remove($account)
+    ->remove($post)
+    ->run();
+```

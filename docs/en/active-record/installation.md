@@ -19,7 +19,7 @@ The preferred way to install this package is through [Composer](https://getcompo
 composer require cycle/active-record
 ```
 
-After package install you need to, optionally, register bootloader / service-provider in your application.
+After package install you need to, optionally, register bootloader (service-provider) in your application.
 
 ## Framework-Specific Configuration
 
@@ -29,16 +29,7 @@ If you are installing the package on the Spiral Framework with the [spiral-packa
 
 Otherwise, update the Bootloader list in your application configuration:
 
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Application;
-
-use Spiral\Cycle\Bootloader as CycleBridge;
-use Cycle\ActiveRecord\Bridge\Spiral\Bootloader\ActiveRecordBootloader;
-
+```php Kernel.php
 class Kernel extends \Spiral\Framework\Kernel
 {
     public function defineBootloaders(): array
