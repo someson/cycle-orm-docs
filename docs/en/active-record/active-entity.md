@@ -273,26 +273,6 @@ If you prefer to have an exception thrown when the operation fails, you can use 
 $user->saveOrFail();
 ```
 
-Each call to the `save()` or `saveOrFail()` method generates at least one transaction to the database.
-However, you may need to save multiple distinct entities in a single transaction.
-To achieve this, you can use the `persist()` method:
-
-```php
-foreach ($users as $user) {
-    $em = $user->persist();
-}
-$em->run();
-```
-
-As you may have already understood, the `persist()` method returns an `EntityManager` object, which can be used in a chain of calls and to initiate a transaction.
-
-```php
-$user->persist()
-    ->persist($account)
-    ->delete($post)
-    ->run();
-```
-
 
 ## Querying Entities
 
@@ -337,12 +317,46 @@ User::findByPK($id)->delete();
 Post::findByPK($id)->deleteOrFail();
 ```
 
-To delete multiple records, you can use the `remove()` method that prepares the entity for deletion.
-It works similarly to the `persist()` method, but it marks the entity for deletion.
+## Transactions
+
+Each call to the `save()`, `delete()`, `deleteOrFail()`, or `saveOrFail()` method
+runs at least one transaction to the database.
+However, you may need to save multiple distinct entities in a single transaction.
+To achieve this, you can use the `transact()` method:
 
 ```php
-$user->remove()
-    ->remove($account)
-    ->remove($post)
-    ->run();
+ActiveRecord::transct(
+    function () use ($users, $user, $account, $post) {
+        array_walk($users, fn ($user) => $user->save());
+        $user->save();
+        $account->save();
+        $post->delete();
+    }
+);
 ```
+
+All the ActiveRecord write operations within the callback will be registered
+using the common Entity Manager without being executed until the end of the callback.
+
+It is different from the [database transaction](/docs/en/database/transactions.md) because it doesn't start
+a new DB transaction outside the Entity Manager.
+To configure the transaction behavior of the Entity Manager, you can use the second parameter of the `transact()` method:
+
+```php
+ActiveRecord::transact(
+    function () use ($users, $user, $account, $post) {
+        array_walk($users, fn ($user) => $user->save());
+        $user->save();
+        $account->save();
+        $post->delete();
+    },
+    TransactionMode::Ignore,
+);
+```
+
+The `TransactionMode` enum provides the following options:
+
+- `TransactionMode::OpenNew` (default) starts a new transaction when the Entity Manager is running after the callback.
+- `TransactionMode::Current` uses the current transaction and throws an exception if there is no active transaction.
+- `TransactionMode::Ignore` does nothing about transactions. If there is an active transaction,
+  it won't be committed or rolled back.

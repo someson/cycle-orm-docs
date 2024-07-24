@@ -1,8 +1,8 @@
 # Active Query
 
-Query classes serve as a wrapper around the query builder provided by CycleORM, allowing for the grouping of common queries together for later reuse and separation.&#x20;
-
-The `ActiveQuery` class extends CycleORM's `Select` class and is specifically designed to integrate with entities managed by `ActiveRecord`. It facilitates the creation of queries that can be easily maintained and reused throughout the application.
+The `ActiveQuery` class extends Cycle ORM `Select` class
+and is specifically designed to integrate with entities managed by `ActiveRecord`.
+It simplifies the process of building queries and can be easily maintained and reused throughout the application.
 
 ## Standard Usage
 
@@ -21,70 +21,105 @@ This method provides a straightforward way to begin a query operation tailored t
 
 To encapsulate specific query logic, developers can create custom query classes that extend the `ActiveQuery` class.
 
-For instance, the `UserQuery` class might define methods to handle common requirements such as filtering by active status or sorting by creation time:
+For example, the `CommonQuery` class might define methods to handle common requirements
+such as filtering by active status or sorting by creation time:
 
-```php UserQuery.php
-class UserQuery extends ActiveQuery
+```php CommonQuery.php
+/**
+ * @template T
+ * @extends ActiveQuery<User>
+ */
+class CommonQuery extends ActiveQuery
 {
-    public function active(bool $state = true): UserQuery
+    public function active(bool $state = true): static
     {
         return $this->where(['active' => $state]);
     }
 
-    public function orderByCreatedAt(string $direction = 'ASC'): UserQuery
+    public function sortByCreateTime(bool $newestFirst = true): static
     {
-        return $this->orderBy(['created_at' => $direction]);
+        return $this->orderBy(['created_at' => $newestFirst ? 'DESC' : 'ASC']);
     }
 }
 ```
 
-By overriding the `query()` method in a derived entity class to return an instance of a custom query class, developers can significantly simplify the data access layer. This approach not only enhances code readability but also improves the organization of business logic:
+By overriding the `query()` method in a derived entity class to return an instance of a custom query class,
+developers can significantly simplify the data access layer.
+This approach not only enhances code readability but also improves the organization of business logic:
 
 ```php User.php
-declare(strict_types=1);
-
-namespace Cycle\App\Entity;
-
-use Cycle\ActiveRecord\ActiveRecord;
-use Cycle\Annotated\Annotation\Column;
-use Cycle\Annotated\Annotation\Entity;
-use Cycle\App\Query\UserQuery;
-
 #[Entity(table: 'user')]
 class User extends ActiveRecord
 {
     // ...
 
     /**
-     * @return UserQuery&#x3C;static>
+     * @return CommonQuery<static>
      */
-    public static function query(): UserQuery
+    public static function query(): CommonQuery
     {
-        return new UserQuery(static::class);
+        return new CommonQuery(static::class);
     }
 }
 ```
 
-## Usage Example
-
-Fetch all user records, which are not active and are ordered by `created-at` field in descending order:
+Now we can fetch all user records, which are not active and are ordered by `createdAt` field in descending order:
 
 ```php
-<?php
-
-use App\Entities\User;
-
 $users = User::query()
     ->active(false)
-    ->orderByCreatedAt('DESC')
+    ->sortByCreateTime(false)
     ->fetchAll();
 ```
 
-### Advantages of Using ActiveQuery
+Now let's personalize the Active Query class to User entity:
 
-- **Organization**: Groups common queries, enhancing code organization and separation.
-- **Reusability**: Promotes the reuse of query logic across different parts of the application.
-- **Maintainability**: Simplifies maintenance by localizing query logic within dedicated classes
+```php UserQuery.php
+/**
+ * @extends CommonQuery<User>
+ */
+class UserQuery extends CommonQuery
+{
+    public function __construct()
+    {
+        parent::__construct(User::class);
+    }
 
+    public function emailVerified(bool $state = true): static
+    {
+        return $this->where(['email_verified' => $state]);
+    }
 
+    public function subscribtionLevel(Subsctiption $level): static
+    {
+        return $this->where('subscriptionLevel', '>=' , $level->alue);
+    }
+}
+```
 
+And update the `User` entity to use the `UserQuery` class:
+
+```php User.php
+#[Entity(table: 'user')]
+class User extends ActiveRecord
+{
+    // ...
+
+    public static function query(): UserQuery
+    {
+        return new UserQuery();
+    }
+}
+```
+
+Now we can use functions from `CommonQuery` and `UserQuery` classes:
+
+```php
+$users = User::query()
+    ->active(false)
+    ->emailVerified(true)
+    ->subscribtionLevel(Subsctiption::Any)
+    ->fetchAll();
+
+$mailer->sendReminder($users);
+```
