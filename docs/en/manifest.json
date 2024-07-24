@@ -148,5 +148,15 @@
       "advanced/testing": "Testing",
       "advanced/limitations": "Limitations"
     }
+  },
+  {
+    "title": "Active Record",
+    "links": {
+      "active-record/introduction": "Introduction",
+      "active-record/installation": "Installation",
+      "active-record/active-entity": "Active Entities",
+      "active-record/active-query": "Active Query",
+      "active-record/active-repository": "Active Repository"
+    }
   }
 ]

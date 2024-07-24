@@ -3,6 +3,10 @@
 Cycle ORM leaves enough room for developers to alter its behavior. In this section, we will try to create an
 ActiveRecord-like entity implementation which is automatically configured based on database introspection.
 
+> Note
+> Cycle ORM has its own powerful [Active Record implementation](/docs/en/active-record/introduction.md).
+> This article is intended to show an alternative way to implement ActiveRecord pattern.
+
 > Engine is still going to use repositories and mappers behind the hood. In this article we are only going to handle
 > column mapping, relation configuration must be done separately.
 
@@ -31,14 +35,14 @@ abstract class Record
     public function save(bool $saveChildren = true): ORM\Transaction\StateInterface
     {
         $manager = new ORM\EntityManager(self::getORM());
-       
+
         return $manager->persist($this, $saveChildren)->run();
     }
 
     public function delete(): ORM\Transaction\StateInterface
     {
         $manager = new ORM\EntityManager(self::getORM());
-       
+
         return $manager->delete($this)->run();
     }
 
@@ -125,14 +129,14 @@ abstract class Record
     public function save(bool $saveChildren = true): ORM\Transaction\StateInterface
     {
         $manager = new ORM\EntityManager(self::getORM());
-       
+
         return $manager->persist($this, $saveChildren)->run();
     }
 
     public function delete(): ORM\Transaction\StateInterface
     {
         $manager = new ORM\EntityManager(self::getORM());
-       
+
         return $manager->delete($this)->run();
     }
 

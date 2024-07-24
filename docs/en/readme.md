@@ -99,3 +99,9 @@ Table of Contents
   * [Usage in Long-Running Applications](/docs/en/advanced/daemonizing.md)
   * [Testing](/docs/en/advanced/testing.md)
   * [Limitations](/docs/en/advanced/limitations.md)
+* Active Record
+  * [Introduction"](/docs/en/active-record/introduction.md)
+  * [Installation"](/docs/en/active-record/installation.md)
+  * [Active Entities"](/docs/en/active-record/active-entity.md)
+  * [Active Query"](/docs/en/active-record/active-query.md)
+  * [Active Repository](/docs/en/active-record/active-repository.md)
